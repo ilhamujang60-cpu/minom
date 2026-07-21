@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <title>Minom</title>
+</head>
+<body>
+  <script>
+    // Halaman ini cuma "pos jaga" -> cek status login, terus lempar ke halaman yang sesuai
+    fetch('/api/me')
+      .then((res) => res.json())
+      .then((data) => {
+        window.location.href = data.loggedIn ? '/dashboard.html' : '/login.html';
+      });
+  </script>
+</body>
+</html>

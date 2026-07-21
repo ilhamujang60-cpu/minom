@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Riwayat - Minom</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div class="dashboard-container">
+    <header class="dashboard-header">
+      <div class="brand">
+        <span class="brand-icon">💊</span>
+        <h1>Minom</h1>
+      </div>
+      <nav class="main-nav">
+        <a href="/dashboard.html" class="nav-btn">Dashboard</a>
+        <a href="/riwayat.html" class="nav-btn active">Riwayat</a>
+      </nav>
+      <div class="user-info">
+        <span>Halo, <strong id="user-nama">...</strong> 👋</span>
+        <button id="logout-btn" class="btn-secondary">Keluar</button>
+      </div>
+    </header>
+
+    <main class="dashboard-main">
+      <div class="dashboard-toolbar">
+        <h2>📜 Riwayat (Sudah Selesai)</h2>
+      </div>
+
+      <div id="medicine-list-riwayat" class="medicine-list"></div>
+      <div id="empty-riwayat" class="empty-state" style="display: none;">
+        <p>Belum ada obat/vitamin yang periodenya selesai.</p>
+      </div>
+    </main>
+  </div>
+
+  <script src="/js/bg-dots.js"></script>
+  <script src="/js/riwayat.js"></script>
+</body>
+</html>

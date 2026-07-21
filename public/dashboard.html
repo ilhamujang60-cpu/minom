@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard - Minom</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div id="reminder-banner" class="reminder-banner"></div>
+
+  <div class="dashboard-container">
+    <header class="dashboard-header">
+      <div class="brand">
+        <span class="brand-icon">💊</span>
+        <h1>Minom</h1>
+      </div>
+      <nav class="main-nav">
+        <a href="/dashboard.html" class="nav-btn active">Dashboard</a>
+        <a href="/riwayat.html" class="nav-btn">Riwayat</a>
+      </nav>
+      <div class="user-info">
+        <span>Halo, <strong id="user-nama">...</strong> 👋</span>
+        <button id="logout-btn" class="btn-secondary">Keluar</button>
+      </div>
+    </header>
+
+    <main class="dashboard-main">
+      <div class="dashboard-toolbar">
+        <h2>Sedang Dikonsumsi</h2>
+        <a href="/medicine-add.html" class="btn-primary btn-add">+ Tambah Obat/Vitamin</a>
+      </div>
+
+      <!-- Kosong dulu, nanti diisi JavaScript (dashboard.js) pas fetch data dari /api/medicines -->
+      <div id="medicine-list-aktif" class="medicine-list"></div>
+      <div id="empty-aktif" class="empty-state" style="display: none;">
+        <p>Belum ada obat/vitamin yang aktif.</p>
+        <p class="empty-note">Klik tombol "+ Tambah Obat/Vitamin" di atas buat mulai nyatet.</p>
+      </div>
+    </main>
+  </div>
+
+  <script src="/js/bg-dots.js"></script>
+  <script src="/js/dashboard.js"></script>
+  <script src="/js/reminder.js"></script>
+</body>
+</html>
