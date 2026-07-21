@@ -51,9 +51,14 @@ app.use('/api', schedulesApi);
 // ==========================
 app.use(express.static(path.join(__dirname, 'public')));
 
+
 // ==========================
-// Jalankan server
+// Jalankan server & Export untuk Vercel
 // ==========================
-app.listen(PORT, () => {
-  console.log(`✅ Minom jalan di http://localhost:${PORT}`);
-});
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
+    console.log(`✅ Minom jalan di http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app; // <--- WAJIB ditambahkan untuk Vercel!
