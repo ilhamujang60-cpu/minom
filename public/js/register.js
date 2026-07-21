@@ -1,41 +1,51 @@
-// public/js/register.js
-// Tugas file ini: pas form di-submit, JANGAN reload halaman (default browser),
-// tapi kirim datanya ke server lewat fetch(), terus urus hasilnya sendiri.
+document.addEventListener('DOMContentLoaded', () => {
+  const registerForm = document.getElementById('register-form');
+  const errorBox = document.getElementById('error-box');
 
-const form = document.getElementById('register-form');
-const errorBox = document.getElementById('error-box');
+  if (registerForm) {
+    registerForm.addEventListener('submit', async (e) => {
+      e.preventDefault(); // Mencegah halaman reload
 
-form.addEventListener('submit', async function (event) {
-  event.preventDefault(); // cegah browser reload halaman kayak form biasa
+      // Sembunyikan pesan error sebelumnya
+      errorBox.style.display = 'none';
+      errorBox.textContent = '';
 
-  // Ambil semua data dari form, dijadiin object biasa
-  const data = {
-    nama: form.nama.value,
-    email: form.email.value,
-    password: form.password.value,
-    konfirmasi_password: form.konfirmasi_password.value,
-  };
+      // Ambil nilai dari input HTML
+      const nama = document.getElementById('nama').value;
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const konfirmasiPassword = document.getElementById('konfirmasi_password').value;
 
-  try {
-    const response = await fetch('/api/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+      // Validasi kata sandi di sisi klien
+      if (password !== konfirmasiPassword) {
+        errorBox.textContent = 'Konfirmasi password tidak cocok!';
+        errorBox.style.display = 'block';
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/register', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ nama, email, password }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          alert('Pendaftaran berhasil! Silakan masuk.');
+          window.location.href = '/login.html';
+        } else {
+          errorBox.textContent = data.message || 'Gagal mendaftar. Silakan coba lagi.';
+          errorBox.style.display = 'block';
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        errorBox.textContent = 'Terjadi kesalahan pada server/jaringan.';
+        errorBox.style.display = 'block';
+      }
     });
-
-    const result = await response.json();
-
-    if (!response.ok) {
-      // Server bilang ada yang salah (misal email udah kepake) -> tampilin errornya
-      errorBox.textContent = result.error;
-      errorBox.style.display = 'block';
-      return;
-    }
-
-    // Sukses -> arahkan ke halaman login
-    window.location.href = '/login.html?registered=1';
-  } catch (err) {
-    errorBox.textContent = 'Gagal menghubungi server. Coba lagi.';
-    errorBox.style.display = 'block';
   }
 });

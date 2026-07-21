@@ -1,43 +1,41 @@
-// public/js/login.js
+document.addEventListener('DOMContentLoaded', () => {
+  const loginForm = document.querySelector('form'); // Sesuaikan selector jika menggunakan ID/Class
 
-const form = document.getElementById('login-form');
-const errorBox = document.getElementById('error-box');
-const successBox = document.getElementById('success-box');
+  if (loginForm) {
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault(); // Mencegah reload halaman
+      console.log('Tombol Masuk diklik!');
 
-// Cek apakah user baru aja selesai register (dari URL: login.html?registered=1)
-// URLSearchParams itu cara baca "?key=value" di alamat browser
-const params = new URLSearchParams(window.location.search);
-if (params.get('registered') === '1') {
-  successBox.style.display = 'block';
-}
+      // Ambil nilai input
+      const emailInput = document.querySelector('input[type="email"]');
+      const passwordInput = document.querySelector('input[type="password"]');
 
-form.addEventListener('submit', async function (event) {
-  event.preventDefault();
+      const email = emailInput ? emailInput.value : '';
+      const password = passwordInput ? passwordInput.value : '';
 
-  const data = {
-    email: form.email.value,
-    password: form.password.value,
-  };
+      try {
+        const response = await fetch('/api/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email, password }),
+        });
 
-  try {
-    const response = await fetch('/api/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+        const data = await response.json();
+        console.log('Respon dari server:', data);
+
+        if (response.ok) {
+          alert('Login Berhasil!');
+          // window.location.href = '/dashboard.html';
+        } else {
+          alert(data.message || 'Gagal masuk');
+        }
+      } catch (error) {
+        console.error('Error saat menghubungi server:', error);
+      }
     });
-
-    const result = await response.json();
-
-    if (!response.ok) {
-      errorBox.textContent = result.error;
-      errorBox.style.display = 'block';
-      return;
-    }
-
-    // Login sukses -> server udah bikin session (cookie otomatis kesimpen browser)
-    window.location.href = '/dashboard.html';
-  } catch (err) {
-    errorBox.textContent = 'Gagal menghubungi server. Coba lagi.';
-    errorBox.style.display = 'block';
+  } else {
+    console.error('Form login tidak ditemukan di DOM!');
   }
 });
