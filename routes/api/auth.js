@@ -42,11 +42,12 @@ router.post('/register', async (req, res) => {
       [nama, email, hashedPassword]
     );
 
-    return res.json({ success: true });
-  } catch (err) {
-    console.error('Error pada Register:', err);
-    return res.status(500).json({ error: 'Terjadi kesalahan pada server, coba lagi.' });
-  }
+  return res.json({ success: true });
+} catch (err) {
+  console.error('Error pada Register:', err);
+  // Ubah baris di bawah ini:
+  return res.status(500).json({ error: err.message || 'Terjadi kesalahan pada server, coba lagi.' });
+}
 });
 
 // ==========================
