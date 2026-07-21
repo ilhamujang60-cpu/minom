@@ -21,12 +21,11 @@ form.addEventListener('submit', async function (event) {
     catatan: form.catatan.value,
   };
 
-  // Menerima nama_obat ATAU nama dari req.body
-  const nama_obat = req.body.nama_obat || req.body.nama;
-  const { dosis, jenis, tanggal_mulai, tanggal_selesai, catatan } = req.body;
 
-  if (!nama_obat) {
-  return res.status(400).json({ error: 'Nama obat wajib diisi.' });
+  if (!data.nama_obat) {
+    errorBox.textContent = 'Nama obat wajib diisi.';
+    errorBox.style.display = 'block';
+    return;
   }
 
   try {
