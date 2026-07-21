@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (response.ok) {
           alert('Login Berhasil!');
-          // window.location.href = '/dashboard.html';
+          window.location.href = '/dashboard.html';
         } else {
           alert(data.message || 'Gagal masuk');
         }
