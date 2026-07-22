@@ -85,6 +85,48 @@ router.get('/medicines', async (req, res) => {
 });
 
 // ==========================================
+// GET /api/medicines/:id -> Ambil detail 1 obat spesifik beserta jadwalnya
+// ==========================================
+router.get('/medicines/:id', async (req, res) => {
+  try {
+    const userId = req.session ? req.session.userId : null;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Sesi habis, silakan login ulang.' });
+    }
+
+    const { id } = req.params;
+
+    // Ambil detail obat milik user
+    const medResult = await db.query(
+      'SELECT * FROM medicines WHERE id = $1 AND user_id = $2',
+      [id, userId]
+    );
+
+    if (medResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Obat tidak ditemukan.' });
+    }
+
+    const med = medResult.rows[0];
+
+    // Ambil jadwal jam konsumsi obat ini
+    const schedResult = await db.query(
+      'SELECT *, waktu AS jam_konsumsi FROM schedules WHERE medicine_id = $1 ORDER BY waktu ASC',
+      [id]
+    );
+
+    return res.json({
+      ...med,
+      nama: med.nama_obat || med.nama,
+      schedules: schedResult.rows || []
+    });
+  } catch (err) {
+    console.error('Error saat mengambil detail obat:', err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
 // DELETE /api/medicines/:id -> Hapus obat berdasarkan ID
 // ==========================================
 router.delete('/medicines/:id', async (req, res) => {
