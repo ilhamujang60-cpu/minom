@@ -1,181 +1,174 @@
-// routes/api/medicines.js
-const express = require('express');
-const db = require('../../db');
-const router = express.Router();
+// public/js/medicine-schedule.js
 
-// ==========================================
-// 1. POST /api/medicines -> Tambah obat baru
-// ==========================================
-router.post('/medicines', async (req, res) => {
-  try {
-    const userId = req.session ? req.session.userId : null;
-    if (!userId) return res.status(401).json({ error: 'Sesi habis, silakan login ulang.' });
+const params = new URLSearchParams(window.location.search);
+const medicineId = params.get('id');
 
-    const nama_obat = req.body.nama_obat || req.body.nama;
-    const { dosis, jenis, tanggal_mulai, tanggal_selesai, catatan } = req.body;
+const namaEl = document.getElementById('medicine-nama');
+const listEl = document.getElementById('schedule-list');
+const emptyEl = document.getElementById('empty-schedule');
+const form = document.getElementById('schedule-form');
+const errorBox = document.getElementById('error-box');
+const countdownBox = document.getElementById('countdown-box');
 
-    if (!nama_obat) {
-      return res.status(400).json({ error: 'Nama obat wajib diisi.' });
+let currentSchedules = [];
+let timerInterval = null;
+
+if (!medicineId) {
+  window.location.href = '/dashboard.html';
+}
+
+// Fungsi Hitung Mundur Real-time
+function updateCountdown() {
+  if (!countdownBox) return;
+
+  if (currentSchedules.length === 0) {
+    countdownBox.style.display = 'none';
+    return;
+  }
+
+  const now = new Date();
+  let minDiff = Infinity;
+  let nextTarget = null;
+
+  currentSchedules.forEach((s) => {
+    const timeStr = s.jam_konsumsi || s.waktu;
+    if (!timeStr) return;
+
+    const parts = timeStr.split(':');
+    const hours = parseInt(parts[0], 10);
+    const minutes = parseInt(parts[1], 10);
+
+    const target = new Date(now);
+    target.setHours(hours, minutes, 0, 0);
+
+    if (target <= now) {
+      target.setDate(target.getDate() + 1); // Hitung besok
     }
 
-    await db.query(
-      `INSERT INTO medicines (user_id, nama_obat, dosis, jenis, tanggal_mulai, tanggal_selesai, catatan) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [userId, nama_obat, dosis || null, jenis || 'Obat', tanggal_mulai || null, tanggal_selesai || null, catatan || null]
-    );
+    const diff = target - now;
+    if (diff < minDiff) {
+      minDiff = diff;
+      nextTarget = target;
+    }
+  });
 
-    return res.json({ success: true, message: 'Obat berhasil disimpan!' });
-  } catch (err) {
-    console.error('Error tambah obat:', err);
-    return res.status(500).json({ error: err.message });
+  if (nextTarget && minDiff !== Infinity) {
+    countdownBox.style.display = 'block';
+    const totalSeconds = Math.floor(minDiff / 1000);
+    const hrs = Math.floor(totalSeconds / 3600);
+    const mins = Math.floor((totalSeconds % 3600) / 60);
+    const secs = totalSeconds % 60;
+
+    if (totalSeconds <= 0) {
+      countdownBox.innerHTML = `🚨 <span style="color: #d97706;">Waktunya minum obat sekarang!</span>`;
+    } else if (hrs > 0) {
+      countdownBox.innerHTML = `⏳ Minum berikutnya dalam <strong>${hrs} jam ${mins} mnt ${secs} dtk lagi</strong>`;
+    } else if (mins > 0) {
+      countdownBox.innerHTML = `⏳ Minum berikutnya dalam <strong>${mins} mnt ${secs} dtk lagi</strong>`;
+    } else {
+      countdownBox.innerHTML = `⏳ Minum berikutnya dalam <strong>${secs} dtk lagi</strong>`;
+    }
   }
-});
+}
 
-// ==========================================
-// 2. GET /api/medicines -> Ambil semua obat milik user
-// ==========================================
-router.get('/medicines', async (req, res) => {
+// Ambil data obat & jadwal
+async function muatData() {
   try {
-    const userId = req.session ? req.session.userId : null;
-    if (!userId) return res.status(401).json({ error: 'Sesi habis, silakan login ulang.' });
+    const response = await fetch(`/api/medicines/${medicineId}`);
 
-    const medResult = await db.query(
-      'SELECT * FROM medicines WHERE user_id = $1 ORDER BY id DESC',
-      [userId]
-    );
-
-    const medicines = await Promise.all(
-      medResult.rows.map(async (med) => {
-        const schedResult = await db.query(
-          'SELECT id, waktu AS jam_konsumsi FROM schedules WHERE medicine_id = $1 ORDER BY waktu ASC',
-          [med.id]
-        );
-        return {
-          ...med,
-          nama: med.nama_obat || med.nama,
-          schedules: schedResult.rows || []
-        };
-      })
-    );
-
-    return res.json(medicines);
-  } catch (err) {
-    console.error('Error ambil daftar obat:', err);
-    return res.status(500).json({ error: err.message });
-  }
-});
-
-// ==========================================
-// 3. GET /api/medicines/:id -> Detail 1 obat + jadwalnya (Dipakai medicine-schedule.js)
-// ==========================================
-router.get('/medicines/:id', async (req, res) => {
-  try {
-    const userId = req.session ? req.session.userId : null;
-    if (!userId) return res.status(401).json({ error: 'Sesi habis, silakan login ulang.' });
-
-    const { id } = req.params;
-
-    const medResult = await db.query(
-      'SELECT * FROM medicines WHERE id = $1 AND user_id = $2',
-      [id, userId]
-    );
-
-    if (medResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Obat tidak ditemukan.' });
+    if (!response.ok) {
+      window.location.href = '/dashboard.html';
+      return;
     }
 
-    const med = medResult.rows[0];
+    const medicine = await response.json();
+    if (namaEl) namaEl.textContent = medicine.nama || medicine.nama_obat || 'Obat';
 
-    // Ambil jadwal jam konsumsi (pilih ID dan waktu sebagai jam_konsumsi)
-    const schedResult = await db.query(
-      'SELECT id, waktu AS jam_konsumsi FROM schedules WHERE medicine_id = $1 ORDER BY waktu ASC',
-      [id]
-    );
+    if (listEl) listEl.innerHTML = '';
+    
+    currentSchedules = Array.isArray(medicine.schedules) ? medicine.schedules : [];
+    if (emptyEl) emptyEl.style.display = currentSchedules.length === 0 ? 'block' : 'none';
 
-    return res.json({
-      ...med,
-      nama: med.nama_obat || med.nama,
-      schedules: schedResult.rows || []
+    currentSchedules.forEach((s) => {
+      const jamText = s.jam_konsumsi || s.waktu || '-';
+      const item = document.createElement('div');
+      item.className = 'schedule-item';
+      item.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 8px;';
+      item.innerHTML = `
+        <span class="schedule-time" style="font-weight: 600; color: #0284c7;">🕐 ${jamText}</span>
+        <button class="btn-delete-small" data-id="${s.id}" style="background: #ef4444; color: white; border: none; padding: 4px 10px; border-radius: 6px; cursor: pointer;">Hapus</button>
+      `;
+      if (listEl) listEl.appendChild(item);
     });
+
+    document.querySelectorAll('.btn-delete-small').forEach((btn) => {
+      btn.addEventListener('click', () => hapusJadwal(btn.dataset.id));
+    });
+
+    // Jalankan timer per detik
+    if (timerInterval) clearInterval(timerInterval);
+    updateCountdown();
+    timerInterval = setInterval(updateCountdown, 1000);
+
   } catch (err) {
-    console.error('Error detail obat:', err);
-    return res.status(500).json({ error: err.message });
+    console.error('Error pada muatData:', err);
   }
-});
+}
 
-// ==========================================
-// 4. POST /api/medicines/:id/schedules -> Tambah jadwal jam baru
-// ==========================================
-router.post('/medicines/:id/schedules', async (req, res) => {
-  try {
-    const userId = req.session ? req.session.userId : null;
-    if (!userId) return res.status(401).json({ error: 'Sesi habis, silakan login ulang.' });
+// Submit Form Tambah Jam
+if (form) {
+  form.addEventListener('submit', async function (event) {
+    event.preventDefault();
 
-    const medicineId = req.params.id;
-    const { jam_konsumsi } = req.body;
+    if (errorBox) {
+      errorBox.style.display = 'none';
+      errorBox.textContent = '';
+    }
+
+    const jamInput = document.getElementById('jam_konsumsi') || form.querySelector('input[type="time"]');
+    const jam_konsumsi = jamInput ? jamInput.value : '';
 
     if (!jam_konsumsi) {
-      return res.status(400).json({ error: 'Jam konsumsi wajib diisi.' });
+      if (errorBox) {
+        errorBox.textContent = 'Pilih jam terlebih dahulu.';
+        errorBox.style.display = 'block';
+      }
+      return;
     }
 
-    await db.query(
-      'INSERT INTO schedules (user_id, medicine_id, waktu) VALUES ($1, $2, $3)',
-      [userId, medicineId, jam_konsumsi]
-    );
+    try {
+      const response = await fetch(`/api/medicines/${medicineId}/schedules`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jam_konsumsi }),
+      });
 
-    return res.json({ success: true, message: 'Jadwal berhasil ditambahkan.' });
-  } catch (err) {
-    console.error('Error tambah jadwal:', err);
-    return res.status(500).json({ error: err.message });
-  }
-});
+      const result = await response.json();
 
-// ==========================================
-// 5. DELETE /api/schedules/:id -> Hapus 1 jadwal jam
-// ==========================================
-router.delete('/schedules/:id', async (req, res) => {
+      if (!response.ok) {
+        if (errorBox) {
+          errorBox.textContent = result.error || 'Gagal menyimpan jadwal.';
+          errorBox.style.display = 'block';
+        }
+        return;
+      }
+
+      if (jamInput) jamInput.value = '';
+      muatData(); // Refresh jadwal & hitung mundur
+    } catch (err) {
+      console.error('Error submit jadwal:', err);
+    }
+  });
+}
+
+// Hapus Jam
+async function hapusJadwal(id) {
   try {
-    const userId = req.session ? req.session.userId : null;
-    if (!userId) return res.status(401).json({ error: 'Sesi habis, silakan login ulang.' });
-
-    const { id } = req.params;
-
-    await db.query(
-      'DELETE FROM schedules WHERE id = $1 AND user_id = $2',
-      [id, userId]
-    );
-
-    return res.json({ success: true, message: 'Jadwal berhasil dihapus.' });
+    await fetch(`/api/schedules/${id}`, { method: 'DELETE' });
+    muatData();
   } catch (err) {
     console.error('Error hapus jadwal:', err);
-    return res.status(500).json({ error: err.message });
   }
-});
+}
 
-// ==========================================
-// 6. DELETE /api/medicines/:id -> Hapus obat
-// ==========================================
-router.delete('/medicines/:id', async (req, res) => {
-  try {
-    const userId = req.session ? req.session.userId : null;
-    if (!userId) return res.status(401).json({ error: 'Sesi habis, silakan login ulang.' });
-
-    const { id } = req.params;
-
-    const result = await db.query(
-      'DELETE FROM medicines WHERE id = $1 AND user_id = $2 RETURNING *',
-      [id, userId]
-    );
-
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: 'Obat tidak ditemukan.' });
-    }
-
-    return res.json({ success: true, message: 'Obat berhasil dihapus.' });
-  } catch (err) {
-    console.error('Error hapus obat:', err);
-    return res.status(500).json({ error: err.message });
-  }
-});
-
-module.exports = router;
+muatData();
