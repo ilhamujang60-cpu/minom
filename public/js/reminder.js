@@ -1,103 +1,96 @@
 // public/js/reminder.js
-// Reminder sederhana: hitung countdown ke jadwal berikutnya,
-// dan kasih notifikasi kalau udah waktunya (selama halaman ini kebuka)
 
-// Minta izin notifikasi browser begitu halaman dibuka (kalau browser mendukung)
-if ('Notification' in window && Notification.permission === 'default') {
-  Notification.requestPermission();
-}
-
-// Nyimpen jam mana aja yang UDAH dikasih notifikasi hari ini,
-// biar ga muncul berkali-kali tiap detik selama menitnya masih sama
-const sudahDiingatkan = new Set();
-
-function formatSisaWaktu(ms) {
-  const totalDetik = Math.floor(ms / 1000);
-  const jam = Math.floor(totalDetik / 3600);
-  const menit = Math.floor((totalDetik % 3600) / 60);
-  const detik = totalDetik % 60;
-
-  if (jam > 0) return `${jam}j ${menit}m lagi`;
-  if (menit > 0) return `${menit}m ${detik}d lagi`;
-  return `${detik} detik lagi`;
-}
-
-// Cari jadwal BERIKUTNYA dari daftar jam (format "HH:MM"), relatif ke sekarang
-function cariJadwalBerikutnya(times, now) {
-  let target = null;
-
-  times.forEach((jamStr) => {
-    const [h, m] = jamStr.split(':').map(Number);
-    const waktuJadwal = new Date(now);
-    waktuJadwal.setHours(h, m, 0, 0);
-
-    // Kalau jadwal hari ini udah lewat, majukan ke besok
-    if (waktuJadwal <= now) {
-      waktuJadwal.setDate(waktuJadwal.getDate() + 1);
-    }
-
-    if (!target || waktuJadwal < target) {
-      target = waktuJadwal;
-    }
-  });
-
-  return target;
-}
-
-function tampilkanNotifikasi(namaObat, jam) {
-  const pesan = `Waktunya minum ${namaObat} (jadwal jam ${jam})`;
-
-  // Notifikasi asli dari browser (tetap perlu tab ini masih kebuka)
-  if ('Notification' in window && Notification.permission === 'granted') {
-    new Notification('⏰ Minom - Waktunya Minum!', { body: pesan });
-  }
-
-  // Banner cadangan di dalam halaman, buat jaga-jaga kalau user belum izinin notifikasi
-  const banner = document.getElementById('reminder-banner');
-  if (banner) {
-    banner.textContent = `⏰ ${pesan}`;
-    banner.classList.add('show');
-    setTimeout(() => banner.classList.remove('show'), 8000);
-  }
-}
-
-// Batas waktu dianggap "udah deket" -> kartu dikasih highlight (progress indicator)
-const BATAS_DUE_SOON_MS = 30 * 60 * 1000; // 30 menit
-
-function cekSemuaJadwal() {
+function hitungMundurJadwal() {
+  const cards = document.querySelectorAll('.medicine-card');
   const now = new Date();
-  const jamSekarang = now.toTimeString().slice(0, 5); // format "HH:MM"
+  let perluRefresh = false;
 
-  document.querySelectorAll('.medicine-card[data-times]').forEach((card) => {
+  cards.forEach((card) => {
     const timesAttr = card.getAttribute('data-times');
-    const namaObat = card.getAttribute('data-nama');
-    if (!timesAttr) return;
+    const tglSelesaiAttr = card.getAttribute('data-selesai');
+    const countdownEl = card.querySelector('.countdown-text');
 
-    const times = timesAttr.split(',').filter(Boolean);
+    if (!countdownEl) return;
+
+    if (!timesAttr || timesAttr.trim() === '') {
+      countdownEl.textContent = 'Belum ada jadwal jam.';
+      return;
+    }
+
+    const times = timesAttr.split(',').map((t) => t.trim()).filter(Boolean);
     if (times.length === 0) return;
 
-    // Cek apakah salah satu jadwal PAS di menit ini
-    times.forEach((jamStr) => {
-      const key = `${namaObat}-${jamStr}-${now.toDateString()}`;
-      if (jamStr === jamSekarang && !sudahDiingatkan.has(key)) {
-        sudahDiingatkan.add(key);
-        tampilkanNotifikasi(namaObat, jamStr);
+    let minDiff = Infinity;
+    let nextTarget = null;
+
+    times.forEach((t) => {
+      const parts = t.split(':');
+      if (parts.length < 2) return;
+
+      const hours = parseInt(parts[0], 10);
+      const minutes = parseInt(parts[1], 10);
+
+      // 1. Cek Waktu Hari Ini
+      const targetToday = new Date(now);
+      targetToday.setHours(hours, minutes, 0, 0);
+
+      if (targetToday > now) {
+        // Masih ada jam konsumsi hari ini
+        const diff = targetToday - now;
+        if (diff < minDiff) {
+          minDiff = diff;
+          nextTarget = targetToday;
+        }
+      } else {
+        // 2. Jam hari ini sudah lewat -> Cek apakah besok masih dalam masa tanggal_selesai
+        const targetTomorrow = new Date(now);
+        targetTomorrow.setDate(targetTomorrow.getDate() + 1);
+        targetTomorrow.setHours(hours, minutes, 0, 0);
+
+        const besokStr = targetTomorrow.toISOString().slice(0, 10);
+        const cleanSelesai = tglSelesaiAttr ? tglSelesaiAttr.split('T')[0] : null;
+
+        // Jika konsumsi rutin (tanpa batas) ATAU besok masih <= tanggal_selesai -> Reset ke jam besok!
+        if (!cleanSelesai || besokStr <= cleanSelesai) {
+          const diff = targetTomorrow - now;
+          if (diff < minDiff) {
+            minDiff = diff;
+            nextTarget = targetTomorrow;
+          }
+        }
       }
     });
 
-    // Update teks countdown ke jadwal berikutnya
-    const target = cariJadwalBerikutnya(times, now);
-    const countdownEl = card.querySelector('.countdown-text');
-    if (countdownEl && target) {
-      const sisaMs = target - now;
-      countdownEl.textContent = `⏳ ${formatSisaWaktu(sisaMs)}`;
+    // Jika tidak ada target tersisa (jam & tanggal hari ini sudah resmi selesai)
+    if (!nextTarget) {
+      perluRefresh = true;
+      return;
+    }
 
-      // Progress indicator: kasih highlight kalau jadwal berikutnya udah deket
-      card.classList.toggle('due-soon', sisaMs <= BATAS_DUE_SOON_MS);
+    // Format dan Tampilkan Waktu
+    const totalSeconds = Math.floor(minDiff / 1000);
+    const hrs = Math.floor(totalSeconds / 3600);
+    const mins = Math.floor((totalSeconds % 3600) / 60);
+    const secs = totalSeconds % 60;
+
+    if (hrs > 0) {
+      countdownEl.innerHTML = `⏳ <strong>${hrs}j ${mins}m lagi</strong>`;
+    } else if (mins > 0) {
+      countdownEl.innerHTML = `⏳ <strong>${mins}m ${secs}d lagi</strong>`;
+    } else {
+      countdownEl.innerHTML = `🚨 <strong>${secs}d lagi!</strong>`;
     }
   });
+
+  // Jika ada obat yang periodenya selesai, hapus dari Dashboard & refresh tampilan
+  if (perluRefresh && typeof window.muatDataObat === 'function') {
+    window.muatDataObat();
+  }
 }
 
-// Cek tiap detik biar countdown-nya smooth & ga kelewat menit pas notif
-setInterval(cekSemuaJadwal, 1000);
-cekSemuaJadwal();
+// Jalankan kalkulasi setiap 1 detik
+setInterval(hitungMundurJadwal, 1000);
+
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(hitungMundurJadwal, 500);
+});
