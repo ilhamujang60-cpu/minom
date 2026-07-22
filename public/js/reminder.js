@@ -1,27 +1,44 @@
 // public/js/reminder.js
 
-// 1. Minta Izin Notifikasi di Browser/Perangkat saat Script Dimuat
-if ("Notification" in window) {
-  if (Notification.permission !== "granted" && Notification.permission !== "denied") {
-    Notification.requestPermission();
+// Fungsi Minta Izin Notifikasi (Harus dipanggil lewat klik tombol/aksi pengguna)
+async function mintaIzinNotifikasi() {
+  if (!("Notification" in window)) {
+    alert("Browser Anda tidak mendukung Notifikasi Perangkat.");
+    return false;
+  }
+
+  let permission = Notification.permission;
+
+  if (permission !== "granted") {
+    permission = await Notification.requestPermission();
+  }
+
+  if (permission === "granted") {
+    new Notification("💊 Notifikasi Minom Aktif!", {
+      body: "Pengingat jadwal minum obat berhasil diaktifkan.",
+      icon: "/favicon.ico"
+    });
+    return true;
+  } else {
+    alert("Izin notifikasi ditolak. Harap izinkan notifikasi dari setelan browser Anda.");
+    return false;
   }
 }
 
-// Fungsi untuk Mengirim Notifikasi Sistem ke Perangkat
+// Fungsi Mengirim Notifikasi
 function kirimNotifikasiPerangkat(namaObat, jam) {
   if ("Notification" in window && Notification.permission === "granted") {
     const hariIniStr = new Date().toISOString().slice(0, 10);
     const notificationKey = `notified_${namaObat}_${jam}_${hariIniStr}`;
 
-    // Cek apakah notifikasi untuk jam ini sudah pernah dikirim hari ini
+    // Cek agar tidak terkirim double dalam 1 hari
     if (!sessionStorage.getItem(notificationKey)) {
       new Notification("💊 Waktunya Minum Obat!", {
         body: `Sudah waktunya minum ${namaObat} (Jadwal: ${jam}). Jangan lupa diminum ya!`,
-        icon: "/favicon.ico", // Sesuaikan jika ada ikon aplikasi
-        tag: notificationKey // Memastikan notifikasi tidak terduplikasi
+        icon: "/favicon.ico",
+        tag: notificationKey
       });
 
-      // Tandai bahwa notifikasi jam ini sudah dikirim
       sessionStorage.setItem(notificationKey, "true");
     }
   }
@@ -58,25 +75,22 @@ function hitungMundurJadwal() {
       const hours = parseInt(parts[0], 10);
       const minutes = parseInt(parts[1], 10);
 
-      // Cek Waktu Hari Ini
       const targetToday = new Date(now);
       targetToday.setHours(hours, minutes, 0, 0);
 
       const diffToday = targetToday - now;
 
-      // KONDISI NOTIFIKASI: Jika selisih waktu tinggal <= 0 detik (sampai toleransi -60 detik)
+      // TRIGGER NOTIFIKASI: Saat selisih waktu tinggal <= 0 detik (sampai 60 detik setelahnya)
       if (diffToday <= 0 && diffToday >= -60000) {
         kirimNotifikasiPerangkat(namaObat, t);
       }
 
       if (targetToday > now) {
-        // Masih ada jam konsumsi hari ini
         if (diffToday < minDiff) {
           minDiff = diffToday;
           nextTarget = targetToday;
         }
       } else {
-        // Jam hari ini sudah lewat -> Cek apakah besok masih dalam periode tanggal_selesai
         const targetTomorrow = new Date(now);
         targetTomorrow.setDate(targetTomorrow.getDate() + 1);
         targetTomorrow.setHours(hours, minutes, 0, 0);
@@ -94,13 +108,11 @@ function hitungMundurJadwal() {
       }
     });
 
-    // Jika semua jadwal jam & tanggal sudah resmi selesai
     if (!nextTarget) {
       perluRefresh = true;
       return;
     }
 
-    // Format dan Tampilkan Waktu
     const totalSeconds = Math.floor(minDiff / 1000);
     const hrs = Math.floor(totalSeconds / 3600);
     const mins = Math.floor((totalSeconds % 3600) / 60);
@@ -115,13 +127,14 @@ function hitungMundurJadwal() {
     }
   });
 
-  // Hapus dari dashboard jika periode habis
   if (perluRefresh && typeof window.muatDataObat === 'function') {
     window.muatDataObat();
   }
 }
 
-// Jalankan kalkulasi setiap 1 detik
+// Ekspor ke window agar bisa dipanggil tombol di HTML
+window.mintaIzinNotifikasi = mintaIzinNotifikasi;
+
 setInterval(hitungMundurJadwal, 1000);
 
 document.addEventListener('DOMContentLoaded', () => {
