@@ -69,7 +69,7 @@ async function muatDataObat() {
   const medicines = await response.json();
 
   const hariIni = new Date().toISOString().slice(0, 10); // format "YYYY-MM-DD"
-  const aktif = medicines.filter((m) => !m.tanggal_selesai || m.tanggal_selesai >= hariIni);
+  const aktif = medicines.filter((m) => !m.tanggal_selesai || m.tanggal_selesai > hariIni);
 
   listAktifEl.innerHTML = '';
   emptyAktifEl.style.display = aktif.length === 0 ? 'block' : 'none';

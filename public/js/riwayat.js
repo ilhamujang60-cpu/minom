@@ -13,7 +13,7 @@ function buatKartuRiwayat(med) {
   const card = document.createElement('div');
   card.className = 'medicine-card medicine-card-riwayat';
 
-  // Bersihkan format tanggal ISO (misal: "2026-07-22T00:00:00.000Z" -> "2026-07-22")
+  // Bersihkan format tanggal ISO (YYYY-MM-DDTHH:MM:SSZ) jadi cuma YYYY-MM-DD
   const tglMulai = med.tanggal_mulai ? med.tanggal_mulai.toString().split('T')[0] : '-';
   const tglSelesai = med.tanggal_selesai ? med.tanggal_selesai.toString().split('T')[0] : '-';
   const namaObat = med.nama || med.nama_obat || 'Obat';
@@ -69,8 +69,9 @@ async function muatRiwayat() {
     const riwayat = medicines.filter((m) => {
       if (!m.tanggal_selesai) return false;
       const tglSelesaiClean = m.tanggal_selesai.toString().split('T')[0];
-      return tglSelesaiClean < hariIni;
+      return tglSelesaiClean <= hariIni;
     });
+    
 
     if (listRiwayatEl) listRiwayatEl.innerHTML = '';
     if (emptyRiwayatEl) emptyRiwayatEl.style.display = riwayat.length === 0 ? 'block' : 'none';
